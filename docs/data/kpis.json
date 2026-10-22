@@ -30,5 +30,37 @@
    "commercial parcel": 1,
    "bad Airbnb geocode": 14
   }
+ },
+ {
+  "date": "2026-10-22",
+  "active_listings": 300,
+  "new_listings": 0,
+  "delisted": 5,
+  "likely_accounts": 70,
+  "unmatched": 4,
+  "by_confidence": {
+   "Low": 198,
+   "Medium": 73,
+   "High": 25,
+   "Unmatched": 4
+  },
+  "by_platform": {
+   "Airbnb": 300
+  },
+  "scraped_by_platform": {
+   "Airbnb": 1269
+  },
+  "platform_status": {
+   "airbnb": {
+    "ok": true,
+    "count": 1269
+   }
+  },
+  "excluded": {
+   "outside county": 1,
+   "inside a town": 953,
+   "commercial parcel": 1,
+   "bad Airbnb geocode": 14
+  }
  }
 ]
