@@ -33,9 +33,27 @@ def load_json(path, default):
     return json.loads(path.read_text()) if path.exists() else default
 
 
+def _jsonable(v):
+    """Recursively replace NaN/NA/NaT with None; browsers reject NaN in JSON."""
+    if isinstance(v, dict):
+        return {k: _jsonable(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_jsonable(x) for x in v]
+    if v is None or isinstance(v, (str, bool, int)):
+        return v
+    try:
+        if pd.isna(v):
+            return None
+    except (TypeError, ValueError):
+        pass
+    if hasattr(v, "item"):  # numpy scalars
+        return v.item()
+    return v
+
+
 def save_json(path, obj, indent=None):
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(obj, indent=indent, default=str))
+    path.write_text(json.dumps(_jsonable(obj), indent=indent, default=str, allow_nan=False))
 
 
 def scrape(names, tiles, run_date):
