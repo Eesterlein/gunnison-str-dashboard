@@ -1,0 +1,34 @@
+[
+ {
+  "date": "2026-10-21",
+  "active_listings": 305,
+  "new_listings": 305,
+  "delisted": 0,
+  "likely_accounts": 71,
+  "unmatched": 4,
+  "by_confidence": {
+   "Low": 202,
+   "Medium": 74,
+   "High": 25,
+   "Unmatched": 4
+  },
+  "by_platform": {
+   "Airbnb": 305
+  },
+  "scraped_by_platform": {
+   "Airbnb": 1279
+  },
+  "platform_status": {
+   "airbnb": {
+    "ok": true,
+    "count": 1279
+   }
+  },
+  "excluded": {
+   "outside county": 1,
+   "inside a town": 958,
+   "commercial parcel": 1,
+   "bad Airbnb geocode": 14
+  }
+ }
+]

@@ -1,0 +1,46 @@
+name: Weekly STR scan
+
+on:
+  schedule:
+    - cron: "0 11 * * 1"   # Mondays 11:00 UTC (5 AM Mountain)
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: "Comma-separated platforms to scrape"
+        default: "airbnb"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: weekly-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Scrape, match, rebuild dashboard data
+        run: python -m pipeline.run --platforms "${{ inputs.platforms || 'airbnb' }}"
+
+      - name: Commit new data
+        run: |
+          git config user.name "str-monitor-bot"
+          git config user.email "str-monitor-bot@users.noreply.github.com"
+          git add data docs/data
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Weekly STR scan $(date -u +%Y-%m-%d)"
+            git push
+          fi

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gunnison STR Monitor</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Sign in -->
+<div id="login" class="login">
+  <form id="loginForm" class="login-card" autocomplete="off">
+    <div class="brand"><span class="brand-mark">STR</span><div><b>Gunnison STR Monitor</b><small>Unincorporated Gunnison County</small></div></div>
+    <label>Username<input id="user" required autocomplete="username"></label>
+    <label>Password<input id="pass" type="password" required autocomplete="current-password"></label>
+    <button type="submit">Sign in</button>
+    <p id="loginErr" class="err" hidden>Incorrect username or password.</p>
+    <p class="fine">Demo sign-in. Data shown is public assessor and listing information.</p>
+  </form>
+</div>
+
+<!-- App -->
+<div id="app" class="app" hidden>
+  <header class="top">
+    <div class="brand"><span class="brand-mark">STR</span><div><b>Gunnison STR Monitor</b><small>Short-term rentals (30 days or less) &middot; unincorporated county only</small></div></div>
+    <div class="top-meta" id="scanMeta"></div>
+    <button class="ghost" id="logout">Sign out</button>
+  </header>
+
+  <aside class="side" id="side">
+    <section class="kpis" id="kpis"></section>
+    <section class="card">
+      <h3>Active listings by week</h3>
+      <div id="trend" class="trend"></div>
+    </section>
+    <section class="card">
+      <h3>Match confidence <span class="hint" title="How sure we are which parcel a listing is on. Airbnb shifts map pins up to a few hundred feet.">?</span></h3>
+      <div id="confBars" class="bars"></div>
+    </section>
+    <section class="card">
+      <h3>By area <small>click to filter</small></h3>
+      <div id="areaBars" class="bars"></div>
+    </section>
+    <section class="card">
+      <h3>By platform</h3>
+      <div id="platBars" class="bars"></div>
+    </section>
+    <section class="card sources" id="sources"></section>
+  </aside>
+
+  <main class="main">
+    <div class="filters">
+      <input id="q" type="search" placeholder="Search owner, address, account, parcel, listing name&hellip;">
+      <select id="fStatus"><option value="active">Active</option><option value="new">New this week</option><option value="delisted">Delisted (12 wks)</option><option value="all">All</option></select>
+      <select id="fConf"><option value="">All confidence</option><option>High</option><option>Medium</option><option>Low</option><option>Unmatched</option></select>
+      <select id="fArea"><option value="">All areas</option></select>
+      <select id="fPlat"><option value="">All platforms</option></select>
+      <label class="chk"><input type="checkbox" id="fView"> In map view only</label>
+      <button id="dl" class="primary">Download CSV</button>
+    </div>
+    <div class="split">
+      <div id="map" class="map"></div>
+      <div class="table-wrap">
+        <div class="table-head"><span id="count"></span><button class="ghost small" id="clear">Clear filters</button></div>
+        <div class="table-scroll"><table id="tbl"><thead><tr>
+          <th data-k="confidence">Conf.</th><th data-k="OWNERNAME">Owner</th><th data-k="PROPERTYLO">Property address</th>
+          <th data-k="ONELINEOWN">Mailing address</th><th data-k="ACCOUNTNO">Account</th><th data-k="area">Area</th><th data-k="first_seen">First seen</th>
+        </tr></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+  </main>
+
+  <div id="detail" class="detail" hidden>
+    <button class="close" id="closeDetail" aria-label="Close">&times;</button>
+    <div id="detailBody"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
