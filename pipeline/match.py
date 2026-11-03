@@ -13,6 +13,9 @@ SEARCH_FT = 800         # Airbnb offsets pins; look this far for candidate parce
 NEAR_FT = 300
 TILE_DEG = 0.04
 NOT_STR_WORDS = re.compile(r"\b(?:rv|campsite|camp ?site|tent|glamping|camper|trailer site|tipi|teepee|yurt|bell tent)\b", re.I)
+# Places that cannot be in Gunnison County. Checked only on unmatched listings, so a real rental
+# that happens to mention one of these words is never dropped.
+ELSEWHERE_WORDS = re.compile(r"\b(?:usvi|u\.s\. virgin islands|virgin islands|st\.? ?(?:thomas|john|croix)|caribbean|puerto rico|bahamas|jamaica|aruba|hawaii|maui|kauai|oahu|mexico|cabo|tulum|costa rica|belize|canada)\b", re.I)
 
 
 def load_gis():
@@ -59,7 +62,8 @@ def match(listings, parcels, towns, county):
     imp = parcels[parcels.IMPSACTUAL.fillna(0) > 0]
     cand = gpd.sjoin(L[["listing_key", "geometry"]], imp, how="inner", predicate="dwithin", distance=SEARCH_FT)
     cand["dist_ft"] = cand.geometry.distance(imp.geometry.loc[cand.index_right], align=False).round()
-    cand = cand.sort_values(["listing_key", "dist_ft"])
+    # Break distance ties by account and parcel number so every run picks the same match.
+    cand = cand.sort_values(["listing_key", "dist_ft", "ACCOUNTNO", "ParcelNumb"], kind="mergesort", na_position="last")
     near = cand[cand.dist_ft <= NEAR_FT]
     n_near = near.groupby("listing_key").ParcelNumb.nunique()
     best = cand.groupby("listing_key").head(1).set_index("listing_key")
@@ -86,6 +90,10 @@ def match(listings, parcels, towns, county):
         stacked = gpd.sjoin(um[["geometry"]], um[["geometry"]], predicate="dwithin", distance=500).groupby(level=0).size()
         bad = stacked[stacked >= 4].index
         L.loc[L.index.isin(bad) & L.exclude_reason.isna(), "exclude_reason"] = "bad Airbnb geocode"
+        # A single misplaced pin cannot stack, so also check what the listing says about itself.
+        text = (um.name.fillna("") + " " + um.description.fillna("")) if "description" in um else um.name.fillna("")
+        elsewhere = text[text.str.contains(ELSEWHERE_WORDS)].index
+        L.loc[L.index.isin(elsewhere) & L.exclude_reason.isna(), "exclude_reason"] = "listing names a place outside Colorado"
     L["area"] = L.PROPERTYLO.map(area_name)
     commercial = L.ACCOUNTTYP.eq("Commercial") & L.confidence.isin(["High", "Medium"])
     L.loc[commercial & L.exclude_reason.isna(), "exclude_reason"] = "commercial parcel"

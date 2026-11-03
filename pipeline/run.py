@@ -79,8 +79,12 @@ def scrape(names, tiles, run_date):
     return results, status
 
 
-def update_history(kept, status, run_date):
+def update_history(kept, status, run_date, excluded_keys=()):
     master = {x["listing_key"]: x for x in load_json(HIST / "listings.json", [])}
+    # A listing kept by an earlier run but excluded by a newer rule was never a real STR here:
+    # remove it instead of counting it as delisted.
+    for k in excluded_keys:
+        master.pop(k, None)
     seen = set()
     for rec in kept.to_dict("records"):
         k = rec["listing_key"]
@@ -183,7 +187,7 @@ def main():
     kept, excluded = M.match(scraped, parcels, towns, county)
     log(f"kept {len(kept)} unincorporated STR listings; excluded {len(excluded)}: "
         f"{dict(Counter(excluded.exclude_reason.str.replace(r'inside .*', 'inside a town', regex=True)))}")
-    recs = update_history(kept, status, a.date)
+    recs = update_history(kept, status, a.date, set(excluded.listing_key))
     k = kpis(recs, a.date, status, scraped)
     k["excluded"] = dict(Counter(excluded.exclude_reason.str.replace(r"inside .*", "inside a town", regex=True)))
     runs = [r for r in runs if r["date"] != a.date] + [k]

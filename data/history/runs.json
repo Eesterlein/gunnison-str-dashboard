@@ -100,13 +100,13 @@
   "active_listings": 253,
   "new_listings": 3,
   "delisted": 51,
-  "likely_accounts": 52,
-  "unmatched": 5,
+  "likely_accounts": 53,
+  "unmatched": 4,
   "by_confidence": {
    "Low": 170,
-   "Medium": 59,
+   "Medium": 60,
    "High": 19,
-   "Unmatched": 5
+   "Unmatched": 4
   },
   "by_platform": {
    "Airbnb": 253
@@ -122,8 +122,8 @@
   },
   "excluded": {
    "inside a town": 915,
-   "commercial parcel": 1,
    "bad Airbnb geocode": 13,
+   "listing names a place outside Colorado": 1,
    "outside county": 1
   }
  }
