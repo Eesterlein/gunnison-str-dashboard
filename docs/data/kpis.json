@@ -126,5 +126,36 @@
    "listing names a place outside Colorado": 1,
    "outside county": 1
   }
+ },
+ {
+  "date": "2026-11-09",
+  "active_listings": 303,
+  "new_listings": 2,
+  "delisted": 1,
+  "likely_accounts": 70,
+  "unmatched": 5,
+  "by_confidence": {
+   "Low": 200,
+   "Medium": 74,
+   "High": 24,
+   "Unmatched": 5
+  },
+  "by_platform": {
+   "Airbnb": 303
+  },
+  "scraped_by_platform": {
+   "Airbnb": 1274
+  },
+  "platform_status": {
+   "airbnb": {
+    "ok": true,
+    "count": 1274
+   }
+  },
+  "excluded": {
+   "outside county": 1,
+   "inside a town": 954,
+   "bad Airbnb geocode": 16
+  }
  }
 ]
