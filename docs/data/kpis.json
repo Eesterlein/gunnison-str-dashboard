@@ -189,5 +189,36 @@
    "bad Airbnb geocode": 9,
    "outside county": 1
   }
+ },
+ {
+  "date": "2026-11-20",
+  "active_listings": 310,
+  "new_listings": 11,
+  "delisted": 5,
+  "likely_accounts": 69,
+  "unmatched": 5,
+  "by_confidence": {
+   "Low": 208,
+   "Medium": 74,
+   "High": 23,
+   "Unmatched": 5
+  },
+  "by_platform": {
+   "Airbnb": 310
+  },
+  "scraped_by_platform": {
+   "Airbnb": 1298
+  },
+  "platform_status": {
+   "airbnb": {
+    "ok": true,
+    "count": 1298
+   }
+  },
+  "excluded": {
+   "outside county": 1,
+   "inside a town": 969,
+   "bad Airbnb geocode": 18
+  }
  }
 ]
