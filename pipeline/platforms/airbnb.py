@@ -104,7 +104,7 @@ def scrape(tiles, workers=4, log=print):
     session.headers.update({"User-Agent": UA, "Accept-Language": "en-US"})
     found, seen_windows = {}, {}
     jobs = [(t, w, 0) for w in date_windows() for t in tiles]
-    done, empty, retry_round = 0, [], 0
+    done, empty, retry_round, tiles_with_hits = 0, [], 0, set()
     while jobs:
         nxt = []
         with ThreadPoolExecutor(workers) as ex:
@@ -113,7 +113,9 @@ def scrape(tiles, workers=4, log=print):
                 tile, win, depth = futs[f]
                 listings, capped = f.result()
                 done += 1
-                if not listings:
+                if listings:
+                    tiles_with_hits.add(tile)
+                else:
                     empty.append((tile, win, depth))
                 if capped and depth < 3:
                     nxt += [(t, win, depth + 1) for t in _split(tile)]
@@ -124,9 +126,11 @@ def scrape(tiles, workers=4, log=print):
                     log(f"airbnb: {done} tile-searches, {len(found)} unique listings")
         if nxt:
             log(f"airbnb: splitting {len(nxt)} capped tiles")
+        # Throttled requests come back as normal pages with zero results. Most rural tiles are
+        # truly empty, so only retry an empty search when the same tile found listings in
+        # another date window - the pattern a throttled stretch of the scan leaves behind.
+        empty = [j for j in empty if j[0] in tiles_with_hits]
         if not nxt and empty and retry_round < EMPTY_RETRIES:
-            # Throttled requests come back as normal pages with zero results, so retry empty
-            # searches after a pause. Truly empty tiles just come back empty again.
             retry_round += 1
             log(f"airbnb: retrying {len(empty)} empty searches (round {retry_round}) after a pause")
             time.sleep(90)

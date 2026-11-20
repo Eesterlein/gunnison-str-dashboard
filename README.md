@@ -58,7 +58,10 @@ Trigger a run by hand from **Actions → Weekly STR scan → Run workflow**.
 
 ## Safety checks
 
-- If a platform returns less than half of last week's count (likely blocked), nothing from that platform is marked delisted that week.
+- Airbnb sometimes throttles the scan by returning normal-looking pages with no results. Searches that come back empty are retried up to twice after a pause.
+- If a platform returns less than 80% of its best count from the last 4 runs (likely partly blocked), nothing from that platform is marked delisted that run.
+- A listing counts as delisted only after it is missing from **two full scans in a row**. After one missed scan it stays active, and its detail panel notes the missed scan.
+- `python -m pipeline.run --rematch --date YYYY-MM-DD` re-runs a saved scan and undoes what it did first. `python -m pipeline.run --rebuild-history` replays every saved scan from scratch (the old history is kept as `.json.bak`).
 - If a platform fails, the run continues with the others. The dashboard's Sources box shows each platform's status.
 
 ## Roadmap

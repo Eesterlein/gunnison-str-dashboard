@@ -23,6 +23,7 @@ HIST = ROOT / "data" / "history"
 SITE = ROOT / "docs" / "data"
 PLATFORMS = {"airbnb": airbnb}
 DROP_GUARD = 0.8  # a platform returning < 80% of its recent normal count is treated as partly blocked
+MISS_RUNS = 2    # a listing counts as delisted only after this many full scans in a row without it
 GUARD_RUNS = 4   # "recent normal" = the highest count among this many previous runs
 
 
@@ -88,11 +89,15 @@ def scrape(names, tiles, run_date):
 
 def update_history(kept, status, run_date, excluded_keys=(), redo=False):
     master = {x["listing_key"]: x for x in load_json(HIST / "listings.json", [])}
-    if redo:  # re-running a saved scan: undo the delistings that scan made, then decide again
+    if redo:  # re-running a saved scan: undo what that scan did, then decide again
         for rec in master.values():
             if rec.get("delisted_on") == run_date:
                 rec["active"] = True
                 rec.pop("delisted_on", None)
+            if run_date in rec.get("missed", []):
+                rec["missed"].remove(run_date)
+                if not rec["missed"]:
+                    rec.pop("missed")
     # A listing kept by an earlier run but excluded by a newer rule was never a real STR here:
     # remove it instead of counting it as delisted.
     for k in excluded_keys:
@@ -109,10 +114,14 @@ def update_history(kept, status, run_date, excluded_keys=(), redo=False):
             rec["staff_confirmed_account"] = old["staff_confirmed_account"]
         master[k] = rec
     trusted = {PLATFORMS[n].__name__.split(".")[-1].title() for n, s in status.items() if s["ok"]}
+    # One missed scan is usually a scraping glitch (throttled tiles), so a listing stays
+    # active but flagged until it has been missing from MISS_RUNS full scans in a row.
     for k, rec in master.items():
         if k not in seen and rec.get("active") and rec["platform"] in trusted:
-            rec["active"] = False
-            rec["delisted_on"] = run_date
+            rec.setdefault("missed", []).append(run_date)
+            if len(rec["missed"]) >= MISS_RUNS:
+                rec["active"] = False
+                rec["delisted_on"] = run_date
     recs = sorted(master.values(), key=lambda r: r["listing_key"])
     save_json(HIST / "listings.json", recs)
     return recs
@@ -128,6 +137,7 @@ def kpis(recs, run_date, status, scraped):
         "delisted": sum(r.get("delisted_on") == run_date for r in recs),
         "likely_accounts": len(accounts),
         "unmatched": sum(r["confidence"] == "Unmatched" for r in active),
+        "missing_this_run": sum(bool(r.get("missed")) for r in active),
         "by_confidence": dict(Counter(r["confidence"] for r in active)),
         "by_platform": dict(Counter(r["platform"] for r in active)),
         "scraped_by_platform": dict(Counter(x["platform"] for x in scraped)),
@@ -140,7 +150,7 @@ def build_site(recs, parcels, runs):
     keep_cols = ["listing_key", "platform", "listing_id", "url", "name", "description", "rating", "beds_baths",
                  "lat", "lng", "confidence", "dist_ft", "parcels_within_300ft", "ACCOUNTNO", "ParcelNumb",
                  "OWNERNAME", "ONELINEOWN", "OWNERSTREE", "OWNERCITY", "OWNERSTATE", "OWNERZIP", "PROPERTYLO", "SUBDIVISIO", "TAXDISTRIC", "ACCOUNTTYP", "area",
-                 "TOTALACTUA", "ft_to_town", "candidates", "first_seen", "last_seen", "active", "delisted_on",
+                 "TOTALACTUA", "ft_to_town", "candidates", "first_seen", "last_seen", "active", "delisted_on", "missed",
                  "search_windows"]
     last = runs[-1]["date"] if runs else None
     recent = [r for r in recs if r["active"] or (r.get("delisted_on") and r["delisted_on"] >= _weeks_ago(last, 12))]
@@ -172,6 +182,7 @@ def main():
     ap.add_argument("--platforms", default=",".join(PLATFORMS))
     ap.add_argument("--rebuild-only", action="store_true")
     ap.add_argument("--rematch", action="store_true", help="re-match data/raw/<date> instead of scraping")
+    ap.add_argument("--rebuild-history", action="store_true", help="replay all saved scans from scratch")
     ap.add_argument("--date", default=date.today().isoformat())
     a = ap.parse_args()
 
@@ -181,32 +192,50 @@ def main():
         build_site(load_json(HIST / "listings.json", []), parcels, runs)
         return
 
+    if a.rebuild_history:  # replay every saved scan from scratch, oldest first
+        for f in (HIST / "listings.json", HIST / "runs.json"):
+            if f.exists():
+                f.rename(f.with_suffix(".json.bak"))
+        for d in sorted(p.name for p in RAW.iterdir() if p.is_dir()):
+            log(f"--- {d}")
+            process(d, *load_raw(d), parcels, towns, county, redo=False)
+        return
+
     if a.rematch:  # re-run matching on a saved raw scrape (e.g. after changing match rules)
-        scraped, status = [], {}
-        for f in sorted((RAW / a.date).glob("*.json.gz")):
-            with gzip.open(f, "rt") as fh:
-                rows = json.load(fh)
-            scraped += rows
-            status[f.name.split(".")[0]] = guard_status(f.name.split(".")[0], len(rows), a.date)
+        scraped, status = load_raw(a.date)
     else:
         tiles = M.search_tiles(parcels, towns)
         log(f"{len(tiles)} search tiles over unincorporated improved parcels")
         scraped, status = scrape(a.platforms.split(","), tiles, a.date)
+    process(a.date, scraped, status, parcels, towns, county, redo=a.rematch)
+
+
+def load_raw(run_date):
+    scraped, status = [], {}
+    for f in sorted((RAW / run_date).glob("*.json.gz")):
+        with gzip.open(f, "rt") as fh:
+            rows = json.load(fh)
+        scraped += rows
+        status[f.name.split(".")[0]] = guard_status(f.name.split(".")[0], len(rows), run_date)
+    return scraped, status
+
+
+def process(run_date, scraped, status, parcels, towns, county, redo):
     if not scraped:
         raise SystemExit("nothing scraped")
     for x in scraped:
         x["listing_key"] = f"{x['platform']}:{x['listing_id']}"
     kept, excluded = M.match(scraped, parcels, towns, county)
-    log(f"kept {len(kept)} unincorporated STR listings; excluded {len(excluded)}: "
-        f"{dict(Counter(excluded.exclude_reason.str.replace(r'inside .*', 'inside a town', regex=True)))}")
-    recs = update_history(kept, status, a.date, set(excluded.listing_key), redo=a.rematch)
-    k = kpis(recs, a.date, status, scraped)
-    k["excluded"] = dict(Counter(excluded.exclude_reason.str.replace(r"inside .*", "inside a town", regex=True)))
-    runs = [r for r in runs if r["date"] != a.date] + [k]
+    reasons = dict(Counter(excluded.exclude_reason.str.replace(r"inside .*", "inside a town", regex=True)))
+    log(f"kept {len(kept)} unincorporated STR listings; excluded {len(excluded)}: {reasons}")
+    recs = update_history(kept, status, run_date, set(excluded.listing_key), redo=redo)
+    k = kpis(recs, run_date, status, scraped)
+    k["excluded"] = reasons
+    runs = [r for r in load_json(HIST / "runs.json", []) if r["date"] != run_date] + [k]
+    runs.sort(key=lambda r: r["date"])
     save_json(HIST / "runs.json", runs, indent=1)
     build_site(recs, parcels, runs)
-    log(json.dumps({x: k[x] for x in ("active_listings", "new_listings", "delisted", "likely_accounts")}))
-
+    log(json.dumps({x: k[x] for x in ("active_listings", "new_listings", "delisted", "missing_this_run", "likely_accounts")}))
 
 if __name__ == "__main__":
     main()

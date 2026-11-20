@@ -279,7 +279,8 @@
       <h4>Listing</h4>
       ${dl([["Name", esc(r.name)], ["Description", esc(r.description)], ["Beds/baths", esc(r.beds_baths)], ["Rating", esc(r.rating)],
         ["Platform", esc(r.platform)], ["Pin (lat, lng)", `${r.lat?.toFixed(5)}, ${r.lng?.toFixed(5)}`], ["First seen", esc(r.first_seen)],
-        ["Last seen", esc(r.last_seen)], ["Pin to parcel", r.dist_ft != null ? `${fmt(r.dist_ft)} ft` : null]])}
+        ["Last seen", esc(r.last_seen)],
+        ["Not found in", r.active && r.missed?.length ? `${esc(r.missed.join(", "))} scan (still counted as active; delisted if missing from the next scan too)` : null], ["Pin to parcel", r.dist_ft != null ? `${fmt(r.dist_ft)} ft` : null]])}
       <p class="note">${confText}</p>
       ${(r.candidates || []).length > 1 ? `<h4>Candidate parcels within 300 ft</h4><table class="cands">${r.candidates.map((c) =>
         `<tr><td><a href="${PROPERTY_URL(c.account)}" target="_blank" rel="noopener">${esc(c.account)}</a></td><td>${esc(c.address)}<br><small>${esc(c.owner)}</small></td><td>${c.ft} ft</td></tr>`).join("")}</table>` : ""}`;

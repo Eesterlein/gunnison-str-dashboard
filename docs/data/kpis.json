@@ -1,19 +1,20 @@
 [
  {
   "date": "2026-10-21",
-  "active_listings": 305,
-  "new_listings": 305,
+  "active_listings": 306,
+  "new_listings": 306,
   "delisted": 0,
-  "likely_accounts": 71,
+  "likely_accounts": 72,
   "unmatched": 4,
+  "missing_this_run": 0,
   "by_confidence": {
    "Low": 202,
-   "Medium": 74,
+   "Medium": 75,
    "High": 25,
    "Unmatched": 4
   },
   "by_platform": {
-   "Airbnb": 305
+   "Airbnb": 306
   },
   "scraped_by_platform": {
    "Airbnb": 1279
@@ -27,25 +28,25 @@
   "excluded": {
    "outside county": 1,
    "inside a town": 958,
-   "commercial parcel": 1,
    "bad Airbnb geocode": 14
   }
  },
  {
   "date": "2026-10-22",
-  "active_listings": 300,
+  "active_listings": 306,
   "new_listings": 0,
-  "delisted": 5,
-  "likely_accounts": 70,
+  "delisted": 0,
+  "likely_accounts": 72,
   "unmatched": 4,
+  "missing_this_run": 5,
   "by_confidence": {
-   "Low": 198,
-   "Medium": 73,
+   "Low": 202,
+   "Medium": 75,
    "High": 25,
    "Unmatched": 4
   },
   "by_platform": {
-   "Airbnb": 300
+   "Airbnb": 306
   },
   "scraped_by_platform": {
    "Airbnb": 1269
@@ -59,25 +60,25 @@
   "excluded": {
    "outside county": 1,
    "inside a town": 953,
-   "commercial parcel": 1,
    "bad Airbnb geocode": 14
   }
  },
  {
   "date": "2026-10-26",
-  "active_listings": 301,
+  "active_listings": 304,
   "new_listings": 2,
-  "delisted": 2,
-  "likely_accounts": 72,
+  "delisted": 4,
+  "likely_accounts": 73,
   "unmatched": 4,
+  "missing_this_run": 2,
   "by_confidence": {
-   "Low": 197,
-   "Medium": 75,
+   "Low": 199,
+   "Medium": 76,
    "High": 25,
    "Unmatched": 4
   },
   "by_platform": {
-   "Airbnb": 301
+   "Airbnb": 304
   },
   "scraped_by_platform": {
    "Airbnb": 1277
@@ -91,25 +92,25 @@
   "excluded": {
    "outside county": 1,
    "inside a town": 958,
-   "commercial parcel": 1,
    "bad Airbnb geocode": 16
   }
  },
  {
   "date": "2026-11-02",
-  "active_listings": 253,
-  "new_listings": 3,
-  "delisted": 51,
-  "likely_accounts": 53,
+  "active_listings": 304,
+  "new_listings": 2,
+  "delisted": 2,
+  "likely_accounts": 73,
   "unmatched": 4,
+  "missing_this_run": 51,
   "by_confidence": {
-   "Low": 170,
-   "Medium": 60,
-   "High": 19,
+   "Low": 199,
+   "Medium": 76,
+   "High": 25,
    "Unmatched": 4
   },
   "by_platform": {
-   "Airbnb": 253
+   "Airbnb": 304
   },
   "scraped_by_platform": {
    "Airbnb": 1183
@@ -129,19 +130,20 @@
  },
  {
   "date": "2026-11-09",
-  "active_listings": 303,
+  "active_listings": 304,
   "new_listings": 2,
-  "delisted": 1,
-  "likely_accounts": 70,
+  "delisted": 3,
+  "likely_accounts": 71,
   "unmatched": 5,
+  "missing_this_run": 1,
   "by_confidence": {
    "Low": 200,
    "Medium": 74,
-   "High": 24,
+   "High": 25,
    "Unmatched": 5
   },
   "by_platform": {
-   "Airbnb": 303
+   "Airbnb": 304
   },
   "scraped_by_platform": {
    "Airbnb": 1274
@@ -160,19 +162,20 @@
  },
  {
   "date": "2026-11-16",
-  "active_listings": 303,
+  "active_listings": 304,
   "new_listings": 0,
   "delisted": 0,
-  "likely_accounts": 70,
+  "likely_accounts": 71,
   "unmatched": 5,
+  "missing_this_run": 1,
   "by_confidence": {
    "Low": 200,
    "Medium": 74,
-   "High": 24,
+   "High": 25,
    "Unmatched": 5
   },
   "by_platform": {
-   "Airbnb": 303
+   "Airbnb": 304
   },
   "scraped_by_platform": {
    "Airbnb": 760
@@ -192,19 +195,20 @@
  },
  {
   "date": "2026-11-20",
-  "active_listings": 310,
+  "active_listings": 315,
   "new_listings": 11,
-  "delisted": 5,
-  "likely_accounts": 69,
+  "delisted": 1,
+  "likely_accounts": 70,
   "unmatched": 5,
+  "missing_this_run": 5,
   "by_confidence": {
-   "Low": 208,
+   "Low": 212,
    "Medium": 74,
-   "High": 23,
+   "High": 24,
    "Unmatched": 5
   },
   "by_platform": {
-   "Airbnb": 310
+   "Airbnb": 315
   },
   "scraped_by_platform": {
    "Airbnb": 1298
