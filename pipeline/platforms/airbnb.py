@@ -19,6 +19,7 @@ UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
 # 5 Unique stays (tents, RVs, campers, glamping).
 PROPERTY_TYPES = [1, 2, 3]
 MAX_PAGES = 15
+EMPTY_RETRIES = 2  # extra passes over searches that returned nothing
 STATE_RE = re.compile(r'<script id="data-deferred-state-0"[^>]*>(.*?)</script>', re.S)
 
 
@@ -103,7 +104,7 @@ def scrape(tiles, workers=4, log=print):
     session.headers.update({"User-Agent": UA, "Accept-Language": "en-US"})
     found, seen_windows = {}, {}
     jobs = [(t, w, 0) for w in date_windows() for t in tiles]
-    done = 0
+    done, empty, retry_round = 0, [], 0
     while jobs:
         nxt = []
         with ThreadPoolExecutor(workers) as ex:
@@ -112,6 +113,8 @@ def scrape(tiles, workers=4, log=print):
                 tile, win, depth = futs[f]
                 listings, capped = f.result()
                 done += 1
+                if not listings:
+                    empty.append((tile, win, depth))
                 if capped and depth < 3:
                     nxt += [(t, win, depth + 1) for t in _split(tile)]
                 for x in listings:
@@ -119,9 +122,16 @@ def scrape(tiles, workers=4, log=print):
                     seen_windows.setdefault(x["listing_id"], set()).add("flexible" if win is None else win[0])
                 if done % 100 == 0:
                     log(f"airbnb: {done} tile-searches, {len(found)} unique listings")
+        if nxt:
+            log(f"airbnb: splitting {len(nxt)} capped tiles")
+        if not nxt and empty and retry_round < EMPTY_RETRIES:
+            # Throttled requests come back as normal pages with zero results, so retry empty
+            # searches after a pause. Truly empty tiles just come back empty again.
+            retry_round += 1
+            log(f"airbnb: retrying {len(empty)} empty searches (round {retry_round}) after a pause")
+            time.sleep(90)
+            nxt, empty = empty, []
         jobs = nxt
-        if jobs:
-            log(f"airbnb: splitting {len(jobs)} capped tiles")
     for lid, x in found.items():
         x["search_windows"] = len(seen_windows[lid])
     return list(found.values())

@@ -22,7 +22,8 @@ RAW = ROOT / "data" / "raw"
 HIST = ROOT / "data" / "history"
 SITE = ROOT / "docs" / "data"
 PLATFORMS = {"airbnb": airbnb}
-DROP_GUARD = 0.5  # a platform returning < 50% of last run's count is treated as blocked
+DROP_GUARD = 0.8  # a platform returning < 80% of its recent normal count is treated as partly blocked
+GUARD_RUNS = 4   # "recent normal" = the highest count among this many previous runs
 
 
 def log(*a):
@@ -56,9 +57,19 @@ def save_json(path, obj, indent=None):
     path.write_text(json.dumps(_jsonable(obj), indent=indent, default=str, allow_nan=False))
 
 
+def guard_status(name, count, run_date):
+    """Compare a platform's raw count with its best recent run; a big drop means it was partly blocked."""
+    label = PLATFORMS[name].__name__.split(".")[-1].title()
+    prior = [r for r in load_json(HIST / "runs.json", []) if r["date"] < run_date][-GUARD_RUNS:]
+    best = max((r.get("scraped_by_platform", {}).get(label, 0) for r in prior), default=0)
+    ok = not (best and count < best * DROP_GUARD)
+    if not ok:
+        log(f"{name}: only {count} vs {best} in recent runs - likely partly blocked; not marking anything delisted")
+    return {"ok": ok, "count": count, **({} if ok else {"note": f"partial scan: {count} of ~{best} results"})}
+
+
 def scrape(names, tiles, run_date):
     results, status = [], {}
-    prev_counts = (load_json(HIST / "runs.json", []) or [{}])[-1].get("scraped_by_platform", {})
     for name in names:
         try:
             rows = PLATFORMS[name].scrape(tiles, log=log)
@@ -66,11 +77,7 @@ def scrape(names, tiles, run_date):
             log(f"{name} FAILED: {e}")
             status[name] = {"ok": False, "count": 0, "error": str(e)[:200]}
             continue
-        prev = prev_counts.get(PLATFORMS[name].__name__.split(".")[-1].title(), 0)
-        ok = not (prev and len(rows) < prev * DROP_GUARD)
-        status[name] = {"ok": ok, "count": len(rows)}
-        if not ok:
-            log(f"{name}: only {len(rows)} vs {prev} last run - not marking anything delisted")
+        status[name] = guard_status(name, len(rows), run_date)
         out = RAW / run_date / f"{name}.json.gz"
         out.parent.mkdir(parents=True, exist_ok=True)
         with gzip.open(out, "wt") as f:
@@ -79,8 +86,13 @@ def scrape(names, tiles, run_date):
     return results, status
 
 
-def update_history(kept, status, run_date, excluded_keys=()):
+def update_history(kept, status, run_date, excluded_keys=(), redo=False):
     master = {x["listing_key"]: x for x in load_json(HIST / "listings.json", [])}
+    if redo:  # re-running a saved scan: undo the delistings that scan made, then decide again
+        for rec in master.values():
+            if rec.get("delisted_on") == run_date:
+                rec["active"] = True
+                rec.pop("delisted_on", None)
     # A listing kept by an earlier run but excluded by a newer rule was never a real STR here:
     # remove it instead of counting it as delisted.
     for k in excluded_keys:
@@ -175,7 +187,7 @@ def main():
             with gzip.open(f, "rt") as fh:
                 rows = json.load(fh)
             scraped += rows
-            status[f.name.split(".")[0]] = {"ok": True, "count": len(rows)}
+            status[f.name.split(".")[0]] = guard_status(f.name.split(".")[0], len(rows), a.date)
     else:
         tiles = M.search_tiles(parcels, towns)
         log(f"{len(tiles)} search tiles over unincorporated improved parcels")
@@ -187,7 +199,7 @@ def main():
     kept, excluded = M.match(scraped, parcels, towns, county)
     log(f"kept {len(kept)} unincorporated STR listings; excluded {len(excluded)}: "
         f"{dict(Counter(excluded.exclude_reason.str.replace(r'inside .*', 'inside a town', regex=True)))}")
-    recs = update_history(kept, status, a.date, set(excluded.listing_key))
+    recs = update_history(kept, status, a.date, set(excluded.listing_key), redo=a.rematch)
     k = kpis(recs, a.date, status, scraped)
     k["excluded"] = dict(Counter(excluded.exclude_reason.str.replace(r"inside .*", "inside a town", regex=True)))
     runs = [r for r in runs if r["date"] != a.date] + [k]

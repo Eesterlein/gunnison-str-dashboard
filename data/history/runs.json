@@ -160,27 +160,28 @@
  },
  {
   "date": "2026-11-16",
-  "active_listings": 154,
+  "active_listings": 303,
   "new_listings": 0,
-  "delisted": 149,
-  "likely_accounts": 30,
-  "unmatched": 4,
+  "delisted": 0,
+  "likely_accounts": 70,
+  "unmatched": 5,
   "by_confidence": {
-   "Medium": 40,
-   "Low": 100,
-   "High": 10,
-   "Unmatched": 4
+   "Low": 200,
+   "Medium": 74,
+   "High": 24,
+   "Unmatched": 5
   },
   "by_platform": {
-   "Airbnb": 154
+   "Airbnb": 303
   },
   "scraped_by_platform": {
    "Airbnb": 760
   },
   "platform_status": {
    "airbnb": {
-    "ok": true,
-    "count": 760
+    "ok": false,
+    "count": 760,
+    "note": "partial scan: 760 of ~1277 results"
    }
   },
   "excluded": {
