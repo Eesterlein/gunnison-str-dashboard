@@ -15,7 +15,7 @@ import geopandas as gpd
 import pandas as pd
 
 from pipeline import match as M
-from pipeline.platforms import airbnb
+from pipeline.platforms import airbnb, airbnb_details
 
 ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "data" / "raw"
@@ -24,6 +24,9 @@ SITE = ROOT / "docs" / "data"
 PLATFORMS = {"airbnb": airbnb}
 DROP_GUARD = 0.8  # a platform returning < 80% of its recent normal count is treated as partly blocked
 MISS_RUNS = 2    # a listing counts as delisted only after this many full scans in a row without it
+DETAIL_FIELDS = ("guests", "bedrooms", "beds", "baths", "license_mentions", "description_text", "page", "details_fetched")
+DETAIL_MAX_AGE_DAYS = 28  # re-read each listing page about monthly (license numbers get added)
+DETAIL_MAX_PER_RUN = 500
 GUARD_RUNS = 4   # "recent normal" = the highest count among this many previous runs
 
 
@@ -112,6 +115,9 @@ def update_history(kept, status, run_date, excluded_keys=(), redo=False):
         rec["active"] = True
         if old.get("staff_confirmed_account"):  # reserved for a future "confirm parcel" module
             rec["staff_confirmed_account"] = old["staff_confirmed_account"]
+        for f in DETAIL_FIELDS:  # listing-page details are refreshed on their own schedule
+            if f in old:
+                rec[f] = old[f]
         master[k] = rec
     trusted = {PLATFORMS[n].__name__.split(".")[-1].title() for n, s in status.items() if s["ok"]}
     # One missed scan is usually a scraping glitch (throttled tiles), so a listing stays
@@ -125,6 +131,43 @@ def update_history(kept, status, run_date, excluded_keys=(), redo=False):
     recs = sorted(master.values(), key=lambda r: r["listing_key"])
     save_json(HIST / "listings.json", recs)
     return recs
+
+
+def apply_details(recs, run_date, fetch=airbnb_details.fetch_many):
+    """Read listing pages: details for new/stale listings, and an existence check for listings missing from search."""
+    cutoff = _days_ago(run_date, DETAIL_MAX_AGE_DAYS)
+    todo = [r for r in recs if r["platform"] == "Airbnb" and r["active"] and
+            (r.get("missed") or not r.get("details_fetched") or r["details_fetched"] < cutoff)]
+    todo.sort(key=lambda r: (not r.get("missed"), r.get("details_fetched") or ""))  # existence checks first
+    todo = todo[:DETAIL_MAX_PER_RUN]
+    if not todo:
+        return recs, {"ok": True, "count": 0}
+    log(f"airbnb details: reading {len(todo)} listing pages")
+    got = fetch([r["listing_id"] for r in todo], log=log)
+    n = Counter()
+    for r in todo:
+        d = got.get(r["listing_id"])
+        if not d:
+            continue
+        n[d["page"]] += 1
+        if d["page"] == "removed":  # page gone: delisted now, no need to wait for a second missed scan
+            r["active"], r["delisted_on"], r["delist_reason"] = False, run_date, "listing page removed"
+        elif d["page"] == "ok":
+            for f in DETAIL_FIELDS:
+                if f in d:
+                    r[f] = d[f]
+            r["page"], r["details_fetched"] = "ok", d["fetched"]
+            if r.get("missed"):  # still listed, just not returned by search this week
+                r["still_listed_on"] = run_date
+                r.pop("missed")
+    log(f"airbnb details: {dict(n)}")
+    save_json(HIST / "listings.json", recs)
+    tried = len(got)
+    return recs, {"ok": n["error"] <= max(5, tried * 0.2), "count": tried, "pages": dict(n)}
+
+
+def _days_ago(d, n):
+    return (pd.Timestamp(d) - pd.Timedelta(days=n)).date().isoformat()
 
 
 def kpis(recs, run_date, status, scraped):
@@ -151,7 +194,8 @@ def build_site(recs, parcels, runs):
                  "lat", "lng", "confidence", "dist_ft", "parcels_within_300ft", "ACCOUNTNO", "ParcelNumb",
                  "OWNERNAME", "ONELINEOWN", "OWNERSTREE", "OWNERCITY", "OWNERSTATE", "OWNERZIP", "PROPERTYLO", "SUBDIVISIO", "TAXDISTRIC", "ACCOUNTTYP", "area",
                  "TOTALACTUA", "ft_to_town", "candidates", "first_seen", "last_seen", "active", "delisted_on", "missed",
-                 "search_windows"]
+                 "search_windows", "guests", "bedrooms", "beds", "baths", "license_mentions", "page", "details_fetched",
+                 "delist_reason", "still_listed_on"]
     last = runs[-1]["date"] if runs else None
     recent = [r for r in recs if r["active"] or (r.get("delisted_on") and r["delisted_on"] >= _weeks_ago(last, 12))]
     site = [{c: _clean(r.get(c)) for c in keep_cols} for r in recent]
@@ -182,6 +226,7 @@ def main():
     ap.add_argument("--platforms", default=",".join(PLATFORMS))
     ap.add_argument("--rebuild-only", action="store_true")
     ap.add_argument("--rematch", action="store_true", help="re-match data/raw/<date> instead of scraping")
+    ap.add_argument("--no-details", action="store_true", help="skip reading individual listing pages")
     ap.add_argument("--rebuild-history", action="store_true", help="replay all saved scans from scratch")
     ap.add_argument("--date", default=date.today().isoformat())
     a = ap.parse_args()
@@ -198,7 +243,7 @@ def main():
                 f.rename(f.with_suffix(".json.bak"))
         for d in sorted(p.name for p in RAW.iterdir() if p.is_dir()):
             log(f"--- {d}")
-            process(d, *load_raw(d), parcels, towns, county, redo=False)
+            process(d, *load_raw(d), parcels, towns, county, redo=False, details=False)
         return
 
     if a.rematch:  # re-run matching on a saved raw scrape (e.g. after changing match rules)
@@ -207,7 +252,7 @@ def main():
         tiles = M.search_tiles(parcels, towns)
         log(f"{len(tiles)} search tiles over unincorporated improved parcels")
         scraped, status = scrape(a.platforms.split(","), tiles, a.date)
-    process(a.date, scraped, status, parcels, towns, county, redo=a.rematch)
+    process(a.date, scraped, status, parcels, towns, county, redo=a.rematch, details=not a.rematch and not a.no_details)
 
 
 def load_raw(run_date):
@@ -220,7 +265,7 @@ def load_raw(run_date):
     return scraped, status
 
 
-def process(run_date, scraped, status, parcels, towns, county, redo):
+def process(run_date, scraped, status, parcels, towns, county, redo, details=False):
     if not scraped:
         raise SystemExit("nothing scraped")
     for x in scraped:
@@ -229,6 +274,8 @@ def process(run_date, scraped, status, parcels, towns, county, redo):
     reasons = dict(Counter(excluded.exclude_reason.str.replace(r"inside .*", "inside a town", regex=True)))
     log(f"kept {len(kept)} unincorporated STR listings; excluded {len(excluded)}: {reasons}")
     recs = update_history(kept, status, run_date, set(excluded.listing_key), redo=redo)
+    if details:
+        recs, status["airbnb_details"] = apply_details(recs, run_date)
     k = kpis(recs, run_date, status, scraped)
     k["excluded"] = reasons
     runs = [r for r in load_json(HIST / "runs.json", []) if r["date"] != run_date] + [k]

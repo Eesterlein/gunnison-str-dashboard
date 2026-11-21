@@ -17,7 +17,8 @@ Every Monday a GitHub Action:
    - **Medium:** 2–3 parcels within 300 ft
    - **Low:** a dense area (condos, townhomes); the dashboard lists up to 6 candidate parcels
    - **Unmatched:** no improved parcel within 800 ft
-4. Updates the history: first-seen and last-seen dates for each listing, plus new and delisted listings. It then recomputes the KPIs and commits the data. GitHub Pages serves the result.
+4. Reads each new listing's own page (and re-reads every listing about monthly) for bedrooms, baths, guests and any license number typed into the description. It also checks the page of any listing missing from search: a page that still loads means it's still listed, and a 404 means it was removed.
+5. Updates the history: first-seen and last-seen dates for each listing, plus new and delisted listings. It then recomputes the KPIs and commits the data. GitHub Pages serves the result.
 
 Only stays of 30 days or less are captured. Every result comes from searches for stays of 2 nights to 1 week, so listings with a 30+ night minimum never appear.
 
@@ -35,7 +36,8 @@ Only stays of 30 days or less are captured. Every result comes from searches for
 ```
 pipeline/run.py              weekly entry point (scrape -> match -> history -> site data)
 pipeline/match.py            parcel matching, unincorporated / campsite / commercial filters
-pipeline/platforms/airbnb.py Airbnb scraper
+pipeline/platforms/airbnb.py Airbnb scraper (search results)
+pipeline/platforms/airbnb_details.py  Airbnb listing pages (bedrooms, baths, license numbers, removed listings)
 scripts/build_gis.py         converts the county shapefiles into data/gis/
 data/gis/                    parcels (Feb 2026 county export), town limits, county outline
 data/raw/YYYY-MM-DD/         raw scrape per run (gzipped)
@@ -55,6 +57,10 @@ python scripts/build_gis.py /path/to/GISData   # after a new county GIS export
 To serve the dashboard locally: `cd docs && python -m http.server 8790`.
 
 Trigger a run by hand from **Actions → Weekly STR scan → Run workflow**.
+
+## When it breaks
+
+See [RUNBOOK.md](RUNBOOK.md). GitHub emails the repo owner when a run fails, including a partial (throttled) scan.
 
 ## Safety checks
 

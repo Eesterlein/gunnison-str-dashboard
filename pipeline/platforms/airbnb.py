@@ -19,7 +19,8 @@ UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
 # 5 Unique stays (tents, RVs, campers, glamping).
 PROPERTY_TYPES = [1, 2, 3]
 MAX_PAGES = 15
-EMPTY_RETRIES = 2  # extra passes over searches that returned nothing
+EMPTY_RETRIES = 2
+FAIL_FAST_AFTER = 20  # if none of the first 20 searches returns readable data, stop: the page format changed  # extra passes over searches that returned nothing
 STATE_RE = re.compile(r'<script id="data-deferred-state-0"[^>]*>(.*?)</script>', re.S)
 
 
@@ -34,7 +35,12 @@ def date_windows(today=None):
     return wins
 
 
+class PageFormatChanged(RuntimeError):
+    pass
+
+
 def _fetch(session, url):
+    """(results, cursors), or (None, None) if no readable search data came back after retries."""
     for attempt in range(4):
         try:
             r = session.get(url, timeout=40)
@@ -69,7 +75,7 @@ def _parse(r):
 
 
 def _search_tile(session, tile, window):
-    """Return (listings, capped) for one bounding box and date window."""
+    """Return (listings, capped, readable) for one bounding box and date window."""
     s, w, n, e = tile
     q = {"ne_lat": n, "ne_lng": e, "sw_lat": s, "sw_lng": w, "search_by_map": "true",
          "search_type": "user_map_move", "refinement_paths[]": "/homes"}
@@ -77,19 +83,20 @@ def _search_tile(session, tile, window):
         q.update(checkin=window[0], checkout=window[1], date_picker_type="calendar")
     base = "https://www.airbnb.com/s/homes?" + urllib.parse.urlencode(q)
     base += "".join(f"&l2_property_type_ids%5B%5D={t}" for t in PROPERTY_TYPES)
-    out, queue, pages = [], [None], 0
+    out, queue, pages, readable = [], [None], 0, False
     while queue:
         cursor = queue.pop(0)
         url = base + (f"&cursor={urllib.parse.quote(cursor)}" if cursor else "")
         res, cursors = _fetch(session, url)
         if res is None:
             break
+        readable = True
         out += [x for x in map(_parse, res) if x]
         pages += 1
         if cursor is None:
             queue = cursors[1:]
         time.sleep(1.2)
-    return out, pages >= MAX_PAGES
+    return out, pages >= MAX_PAGES, readable
 
 
 def _split(tile):
@@ -104,15 +111,22 @@ def scrape(tiles, workers=4, log=print):
     session.headers.update({"User-Agent": UA, "Accept-Language": "en-US"})
     found, seen_windows = {}, {}
     jobs = [(t, w, 0) for w in date_windows() for t in tiles]
-    done, empty, retry_round, tiles_with_hits = 0, [], 0, set()
+    done, empty, retry_round, tiles_with_hits, readable_count = 0, [], 0, set(), 0
     while jobs:
         nxt = []
         with ThreadPoolExecutor(workers) as ex:
             futs = {ex.submit(_search_tile, session, t, w): (t, w, d) for t, w, d in jobs}
             for f in as_completed(futs):
                 tile, win, depth = futs[f]
-                listings, capped = f.result()
+                listings, capped, readable = f.result()
                 done += 1
+                readable_count += readable
+                if done == FAIL_FAST_AFTER and readable_count == 0:
+                    for other in futs:
+                        other.cancel()
+                    raise PageFormatChanged(
+                        f"none of the first {FAIL_FAST_AFTER} Airbnb searches returned readable results. Airbnb likely "
+                        "changed its search page format (or blocked the scan outright). See RUNBOOK.md, 'Airbnb page format changed'.")
                 if listings:
                     tiles_with_hits.add(tile)
                 else:

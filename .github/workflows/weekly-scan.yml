@@ -19,7 +19,7 @@ concurrency:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
@@ -44,3 +44,17 @@ jobs:
             git commit -m "Weekly STR scan $(date -u +%Y-%m-%d)"
             git push
           fi
+
+      # GitHub emails the repo owner when a scheduled run fails. A partial scan is saved above
+      # (nothing gets wrongly delisted), then this step fails the run so someone takes a look.
+      - name: Alert if any source was partial or failed
+        run: |
+          python - <<'PY'
+          import json, sys
+          last = json.load(open("data/history/runs.json"))[-1]
+          bad = {k: v for k, v in last["platform_status"].items() if not v.get("ok")}
+          if bad:
+              print(f"::error::Scan {last['date']} was partial or failed: {json.dumps(bad)}. See RUNBOOK.md.")
+              sys.exit(1)
+          print(f"Scan {last['date']} OK: {json.dumps(last['platform_status'])}")
+          PY

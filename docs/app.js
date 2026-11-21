@@ -123,8 +123,10 @@
     $("#scanMeta").innerHTML = `Last scan <b>${esc(r.date || "n/a")}</b><br>${runs.length} weekly scan${runs.length === 1 ? "" : "s"} on record`;
     const st = r.platform_status || {};
     const ex = r.excluded || {};
-    $("#sources").innerHTML = `<b>Sources this scan</b><ul>${Object.entries(st).map(([k, v]) =>
-      `<li>${esc(k[0].toUpperCase() + k.slice(1))}: ${v.ok ? `${fmt(v.count)} listings found county-wide` : `<span style="color:var(--low)">${v.count ? "partial" : "failed"}</span>`}</li>`).join("")}</ul>
+    const srcLine = ([k, v]) => k === "airbnb_details"
+      ? `<li>Airbnb listing pages: ${v.ok ? `${fmt(v.count)} read` : `<span style="color:var(--low)">${v.count ? "partly blocked" : "failed"}</span>`}${v.pages?.removed ? `, ${fmt(v.pages.removed)} removed` : ""}</li>`
+      : `<li>${esc(k[0].toUpperCase() + k.slice(1))}: ${v.ok ? `${fmt(v.count)} listings found county-wide` : `<span style="color:var(--low)">${v.count ? "partial" : "failed"}</span>`}</li>`;
+    $("#sources").innerHTML = `<b>Sources this scan</b><ul>${Object.entries(st).map(srcLine).join("")}</ul>
       <p style="margin:8px 0 0">Excluded: ${Object.entries(ex).map(([k, v]) => `${esc(k)} (${fmt(v)})`).join(", ") || "none"}.
       Parcels: county GIS. Listings are matched to the nearest improved parcel; Airbnb offsets pins, so check <i>Low</i> matches.</p>`;
   }
@@ -258,7 +260,7 @@
     selected = r.listing_key;
     if (pan) map.setView([r.lat, r.lng], Math.max(map.getZoom(), 16), { animate: false });
     const st = statusOf(r);
-    const dl = (pairs) => `<dl>${pairs.filter(([, v]) => v !== undefined).map(([k, v]) => `<dt>${k}</dt><dd>${v ?? "n/a"}</dd>`).join("")}</dl>`;
+    const dl = (pairs) => `<dl>${pairs.filter(([, v]) => v !== undefined && v !== null).map(([k, v]) => `<dt>${k}</dt><dd>${v ?? "n/a"}</dd>`).join("")}</dl>`;
     const confText = {
       High: "Only one improved parcel near the pin. Very likely this account.",
       Medium: "Two or three improved parcels near the pin. Check the candidates below.",
@@ -277,7 +279,8 @@
         ["Account", esc(r.ACCOUNTNO)], ["Parcel", esc(r.ParcelNumb)], ["Area", esc(r.area)], ["Subdivision", esc(r.SUBDIVISIO)],
         ["Tax district", esc(r.TAXDISTRIC)], ["Account type", esc(r.ACCOUNTTYP)], ["Actual value", r.TOTALACTUA ? "$" + fmt(r.TOTALACTUA) : null]])}
       <h4>Listing</h4>
-      ${dl([["Name", esc(r.name)], ["Description", esc(r.description)], ["Beds/baths", esc(r.beds_baths)], ["Rating", esc(r.rating)],
+      ${dl([["Name", esc(r.name)], ["Description", esc(r.description)], ["Size (from listing)", sizeText(r)],
+        ["License # in ad", r.license_mentions?.length ? r.license_mentions.map((m) => `<b>${esc(m.number)}</b> <small>&ldquo;${esc(m.context)}&rdquo;</small>`).join("<br>") : (r.details_fetched ? "none found" : null)], ["Rating", esc(r.rating)],
         ["Platform", esc(r.platform)], ["Pin (lat, lng)", `${r.lat?.toFixed(5)}, ${r.lng?.toFixed(5)}`], ["First seen", esc(r.first_seen)],
         ["Last seen", esc(r.last_seen)],
         ["Not found in", r.active && r.missed?.length ? `${esc(r.missed.join(", "))} scan (still counted as active; delisted if missing from the next scan too)` : null], ["Pin to parcel", r.dist_ft != null ? `${fmt(r.dist_ft)} ft` : null]])}
@@ -286,6 +289,12 @@
         `<tr><td><a href="${PROPERTY_URL(c.account)}" target="_blank" rel="noopener">${esc(c.account)}</a></td><td>${esc(c.address)}<br><small>${esc(c.owner)}</small></td><td>${c.ft} ft</td></tr>`).join("")}</table>` : ""}`;
     $("#detail").hidden = false;
     renderTable();
+  }
+
+  function sizeText(r) {
+    if (r.bedrooms == null && r.baths == null && r.guests == null) return r.details_fetched ? "n/a" : null;
+    const p = (n, w) => (n == null ? null : `${n === 0 && w === "bedroom" ? "Studio" : `${+n} ${w}${+n === 1 ? "" : "s"}`}`);
+    return esc([p(r.bedrooms, "bedroom"), p(r.baths, "bath"), p(r.guests, "guest")].filter(Boolean).join(" · "));
   }
 
   // ---- CSV ---------------------------------------------------------------
@@ -297,7 +306,8 @@
       ["mailing_address_missing", (r) => (r.ACCOUNTNO && !r.OWNERSTREE ? "YES" : "")],
       ["property_address", "PROPERTYLO"], ["area", "area"], ["subdivision", "SUBDIVISIO"], ["tax_district", "TAXDISTRIC"],
       ["match_confidence", "confidence"], ["status", (r) => statusOf(r)], ["platform", "platform"], ["listing_name", "name"],
-      ["listing_url", "url"], ["latitude", "lat"], ["longitude", "lng"], ["first_seen", "first_seen"], ["last_seen", "last_seen"],
+      ["listing_url", "url"], ["bedrooms", "bedrooms"], ["baths", "baths"], ["guests", "guests"],
+      ["license_in_ad", (r) => (r.license_mentions || []).map((m) => m.number).join(" ")], ["latitude", "lat"], ["longitude", "lng"], ["first_seen", "first_seen"], ["last_seen", "last_seen"],
       ["property_record_url", (r) => (r.ACCOUNTNO ? PROPERTY_URL(r.ACCOUNTNO) : "")],
       ["candidate_accounts", (r) => (r.candidates || []).map((c) => c.account).join(" ")],
     ];
