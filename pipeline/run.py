@@ -122,7 +122,8 @@ def update_history(kept, status, run_date, excluded_keys=(), redo=False):
             if f in old:
                 rec[f] = old[f]
         master[k] = rec
-    trusted = {PLATFORMS[n].__name__.split(".")[-1].title() for n, s in status.items() if s["ok"]}
+    # only search platforms decide delistings (status also holds listing-page and known-listing checks)
+    trusted = {PLATFORMS[n].__name__.split(".")[-1].title() for n, s in status.items() if n in PLATFORMS and s["ok"]}
     # One missed scan is usually a scraping glitch (throttled tiles), so a listing stays
     # active but flagged until it has been missing from MISS_RUNS full scans in a row.
     for k, rec in master.items():
