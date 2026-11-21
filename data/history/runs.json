@@ -224,5 +224,44 @@
    "inside a town": 969,
    "bad Airbnb geocode": 18
   }
+ },
+ {
+  "date": "2026-11-21",
+  "active_listings": 311,
+  "new_listings": 1,
+  "delisted": 5,
+  "likely_accounts": 69,
+  "unmatched": 5,
+  "missing_this_run": 0,
+  "by_confidence": {
+   "Low": 209,
+   "Medium": 74,
+   "High": 23,
+   "Unmatched": 5
+  },
+  "by_platform": {
+   "Airbnb": 311
+  },
+  "scraped_by_platform": {
+   "Airbnb": 1191
+  },
+  "platform_status": {
+   "airbnb": {
+    "ok": true,
+    "count": 1191
+   },
+   "airbnb_details": {
+    "ok": true,
+    "count": 311,
+    "pages": {
+     "ok": 311
+    }
+   }
+  },
+  "excluded": {
+   "outside county": 1,
+   "inside a town": 924,
+   "bad Airbnb geocode": 14
+  }
  }
 ]
