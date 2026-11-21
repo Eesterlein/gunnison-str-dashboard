@@ -1,4 +1,4 @@
-"""Weekly pipeline: scrape -> match to parcels -> update history -> write dashboard data.
+"""Monthly pipeline: scrape -> match to parcels -> update history -> write dashboard data.
 
     python -m pipeline.run                      # scrape all automated platforms
     python -m pipeline.run --platforms airbnb
@@ -25,7 +25,7 @@ PLATFORMS = {"airbnb": airbnb}
 DROP_GUARD = 0.8  # a platform returning < 80% of its recent normal count is treated as partly blocked
 MISS_RUNS = 2    # a listing counts as delisted only after this many full scans in a row without it
 DETAIL_FIELDS = ("guests", "bedrooms", "beds", "baths", "license_mentions", "description_text", "page", "details_fetched")
-DETAIL_MAX_AGE_DAYS = 28  # re-read each listing page about monthly (license numbers get added)
+DETAIL_MAX_AGE_DAYS = 25  # scans are monthly, so every listing page is re-read each scan (license numbers get added)
 DETAIL_MAX_PER_RUN = 500
 GUARD_RUNS = 4   # "recent normal" = the highest count among this many previous runs
 
@@ -107,6 +107,9 @@ def update_history(kept, status, run_date, excluded_keys=(), redo=False):
         master.pop(k, None)
     seen = set()
     for rec in kept.to_dict("records"):
+        # Drop empty cells: a column only some rows have (e.g. listing-page details) is NaN for the rest,
+        # and NaN is truthy, so it would read as "already fetched".
+        rec = {c: v for c, v in rec.items() if isinstance(v, (list, dict)) or not pd.isna(v)}
         k = rec["listing_key"]
         seen.add(k)
         old = master.get(k, {})
@@ -157,7 +160,7 @@ def apply_details(recs, run_date, fetch=airbnb_details.fetch_many):
                 if f in d:
                     r[f] = d[f]
             r["page"], r["details_fetched"] = "ok", d["fetched"]
-            if r.get("missed"):  # still listed, just not returned by search this week
+            if r.get("missed"):  # still listed, just not returned by search this scan
                 r["still_listed_on"] = run_date
                 r.pop("missed")
     log(f"airbnb details: {dict(n)}")
@@ -197,7 +200,7 @@ def build_site(recs, parcels, runs):
                  "search_windows", "guests", "bedrooms", "beds", "baths", "license_mentions", "page", "details_fetched",
                  "delist_reason", "still_listed_on"]
     last = runs[-1]["date"] if runs else None
-    recent = [r for r in recs if r["active"] or (r.get("delisted_on") and r["delisted_on"] >= _weeks_ago(last, 12))]
+    recent = [r for r in recs if r["active"] or (r.get("delisted_on") and r["delisted_on"] >= _weeks_ago(last, 26))]
     site = [{c: _clean(r.get(c)) for c in keep_cols} for r in recent]
     save_json(SITE / "listings.json", site)
 

@@ -35,7 +35,7 @@
   <aside class="side" id="side">
     <section class="kpis" id="kpis"></section>
     <section class="card">
-      <h3>Active listings by week</h3>
+      <h3>Active listings by scan</h3>
       <div id="trend" class="trend"></div>
     </section>
     <section class="card">
@@ -56,7 +56,7 @@
   <main class="main">
     <div class="filters">
       <input id="q" type="search" placeholder="Search owner, address, account, parcel, listing name&hellip;">
-      <select id="fStatus"><option value="active">Active</option><option value="new">New this week</option><option value="delisted">Delisted (12 wks)</option><option value="all">All</option></select>
+      <select id="fStatus"><option value="active">Active</option><option value="new">New since last scan</option><option value="delisted">Delisted (6 months)</option><option value="all">All</option></select>
       <select id="fConf"><option value="">All confidence</option><option>High</option><option>Medium</option><option>Low</option><option>Unmatched</option></select>
       <select id="fArea"><option value="">All areas</option></select>
       <select id="fPlat"><option value="">All platforms</option></select>

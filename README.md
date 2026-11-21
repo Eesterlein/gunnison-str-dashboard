@@ -1,6 +1,6 @@
 # Gunnison STR Monitor
 
-A free, self-updating dashboard of short-term rental listings (stays of 30 days or less) in **unincorporated Gunnison County, Colorado**. Each listing is matched to a county assessor account and parcel.
+A free, self-updating (monthly) dashboard of short-term rental listings (stays of 30 days or less) in **unincorporated Gunnison County, Colorado**. Each listing is matched to a county assessor account and parcel.
 
 **Live demo:** https://eesterlein.github.io/gunnison-str-dashboard/
 
@@ -8,7 +8,7 @@ Demo sign-in: username `demo`, password `gunnison-str-2026`. The sign-in is a pl
 
 ## What it does
 
-Every Monday a GitHub Action:
+On the 15th of each month a GitHub Action:
 
 1. Searches Airbnb's public map results across ~300 map tiles. The tiles cover every improved parcel outside the five incorporated towns (Gunnison, Crested Butte, Mt. Crested Butte, Marble, Pitkin). Each tile is searched in 4 date windows, so listings booked on some dates still show up.
 2. Keeps only houses, condos and guesthouses. Hotels, campsites, RV sites, tents and glamping are excluded, as are listings inside the towns.
@@ -17,14 +17,14 @@ Every Monday a GitHub Action:
    - **Medium:** 2–3 parcels within 300 ft
    - **Low:** a dense area (condos, townhomes); the dashboard lists up to 6 candidate parcels
    - **Unmatched:** no improved parcel within 800 ft
-4. Reads each new listing's own page (and re-reads every listing about monthly) for bedrooms, baths, guests and any license number typed into the description. It also checks the page of any listing missing from search: a page that still loads means it's still listed, and a 404 means it was removed.
-5. Updates the history: first-seen and last-seen dates for each listing, plus new and delisted listings. It then recomputes the KPIs and commits the data. GitHub Pages serves the result.
+4. Reads every listing's own page for bedrooms, baths, guests and any license number typed into the description. It also checks the page of any listing missing from search: a page that still loads means it's still listed, and a 404 means it was removed.
+5. Updates the history: first-seen and last-seen dates for each listing, plus new and delisted listings since the last scan. It then recomputes the KPIs and commits the data. GitHub Pages serves the result.
 
 Only stays of 30 days or less are captured. Every result comes from searches for stays of 2 nights to 1 week, so listings with a 30+ night minimum never appear.
 
 ## Dashboard
 
-- **KPIs:** active listings, likely STR accounts, new this week, delisted this week, unmatched, plus a weekly trend
+- **KPIs:** active listings, likely STR accounts, new and delisted since the last scan, unmatched, plus a trend by scan
 - **Breakdowns:** by match confidence, by area (the county's location areas) and by platform. Click a bar to filter.
 - **Map:** matched parcel outlines and listing pins on Topo or Satellite basemaps. Town limits are shaded and excluded.
 - **Search** by owner, address, account, parcel or listing name.
@@ -34,7 +34,7 @@ Only stays of 30 days or less are captured. Every result comes from searches for
 ## Repository layout
 
 ```
-pipeline/run.py              weekly entry point (scrape -> match -> history -> site data)
+pipeline/run.py              monthly entry point (scrape -> match -> history -> site data)
 pipeline/match.py            parcel matching, unincorporated / campsite / commercial filters
 pipeline/platforms/airbnb.py Airbnb scraper (search results)
 pipeline/platforms/airbnb_details.py  Airbnb listing pages (bedrooms, baths, license numbers, removed listings)
@@ -49,14 +49,14 @@ docs/                        the dashboard (GitHub Pages)
 
 ```bash
 pip install -r requirements.txt
-python -m pipeline.run                    # full weekly run
+python -m pipeline.run                    # full monthly run
 python -m pipeline.run --rebuild-only     # regenerate docs/data without scraping
 python scripts/build_gis.py /path/to/GISData   # after a new county GIS export
 ```
 
 To serve the dashboard locally: `cd docs && python -m http.server 8790`.
 
-Trigger a run by hand from **Actions → Weekly STR scan → Run workflow**.
+Trigger a run by hand from **Actions → Monthly STR scan → Run workflow**.
 
 ## When it breaks
 
@@ -66,13 +66,13 @@ See [RUNBOOK.md](RUNBOOK.md). GitHub emails the repo owner when a run fails, inc
 
 - Airbnb sometimes throttles the scan by returning normal-looking pages with no results. Searches that come back empty are retried up to twice after a pause.
 - If a platform returns less than 80% of its best count from the last 4 runs (likely partly blocked), nothing from that platform is marked delisted that run.
-- A listing counts as delisted only after it is missing from **two full scans in a row**. After one missed scan it stays active, and its detail panel notes the missed scan.
+- A listing missing from a scan has its own page checked: if the page is gone (404/410) it is delisted right away; if the page still loads it stays active. If the page can't be read, it stays active and flagged until it is missing from **two full scans in a row**.
 - `python -m pipeline.run --rematch --date YYYY-MM-DD` re-runs a saved scan and undoes what it did first. `python -m pipeline.run --rebuild-history` replays every saved scan from scratch (the old history is kept as `.json.bak`).
 - If a platform fails, the run continues with the others. The dashboard's Sources box shows each platform's status.
 
 ## Roadmap
 
-- **Vrbo** (Phase 2). Vrbo blocks automated servers, so this needs a weekly job on a staff computer using a real browser.
+- **Vrbo** (Phase 2). Vrbo blocks automated servers, so this needs a monthly job on a staff computer using a real browser.
 - More platforms: Booking.com vacation homes and property-manager sites.
 - Staff "confirm parcel" for Low and Medium matches.
 - Registration upload and matching, and letter generation.

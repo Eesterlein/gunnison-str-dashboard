@@ -1,4 +1,4 @@
-// Gunnison STR Monitor - static dashboard. Data is rebuilt weekly by the GitHub Action.
+// Gunnison STR Monitor - static dashboard. Data is rebuilt monthly by the GitHub Action.
 (() => {
   // ---- Demo sign-in -------------------------------------------------------
   // A placeholder gate, not real security: the data files are public. Replace with real auth later.
@@ -120,7 +120,7 @@
 
   function renderMeta() {
     const r = runs.at(-1) || {};
-    $("#scanMeta").innerHTML = `Last scan <b>${esc(r.date || "n/a")}</b><br>${runs.length} weekly scan${runs.length === 1 ? "" : "s"} on record`;
+    $("#scanMeta").innerHTML = `Last scan <b>${esc(r.date || "n/a")}</b><br>${runs.length} scan${runs.length === 1 ? "" : "s"} on record`;
     const st = r.platform_status || {};
     const ex = r.excluded || {};
     const srcLine = ([k, v]) => k === "airbnb_details"
@@ -136,14 +136,14 @@
     const delta = (k) => {
       if (!prev) return `<div class="d flat">first scan</div>`;
       const d = (cur[k] ?? 0) - (prev[k] ?? 0);
-      return `<div class="d ${d > 0 ? "up" : d < 0 ? "down" : "flat"}">${d > 0 ? "+" : ""}${fmt(d)} vs last week</div>`;
+      return `<div class="d ${d > 0 ? "up" : d < 0 ? "down" : "flat"}">${d > 0 ? "+" : ""}${fmt(d)} vs last scan</div>`;
     };
     const card = (v, l, extra, click, wide) => `<div class="kpi${wide ? " wide" : ""}" data-click='${JSON.stringify(click)}'><div class="v">${fmt(v)}</div><div class="l">${l}</div>${extra}</div>`;
     $("#kpis").innerHTML =
       card(cur.active_listings, "Active STR listings", delta("active_listings"), { status: "active", conf: "" }, true) +
       card(cur.likely_accounts, "Likely STR accounts", `<div class="d flat">High + Medium matches</div>`, { status: "active", conf: "" }) +
-      card(cur.new_listings, "New this week", `<div class="d flat">first seen ${esc(cur.date || "")}</div>`, { status: runs.length > 1 ? "new" : "active" }) +
-      card(cur.delisted, "Delisted this week", `<div class="d flat">no longer found</div>`, { status: "delisted" }) +
+      card(cur.new_listings, "New since last scan", `<div class="d flat">first seen ${esc(cur.date || "")}</div>`, { status: runs.length > 1 ? "new" : "active" }) +
+      card(cur.delisted, "Delisted since last scan", `<div class="d flat">no longer found</div>`, { status: "delisted" }) +
       card(cur.unmatched, "Unmatched listings", `<div class="d flat">no parcel nearby</div>`, { status: "active", conf: "Unmatched" });
     document.querySelectorAll(".kpi").forEach((el) => el.addEventListener("click", () => setFilters({ ...JSON.parse(el.dataset.click), area: "", plat: "" })));
     renderTrend();
@@ -151,7 +151,7 @@
 
   function renderTrend() {
     const pts = runs.map((r) => r.active_listings || 0);
-    if (pts.length < 2) { $("#trend").innerHTML = `<p class="note">The trend line starts after the second weekly scan. Current: <b>${fmt(pts[0])}</b> active listings.</p>`; return; }
+    if (pts.length < 2) { $("#trend").innerHTML = `<p class="note">The trend line starts after the second scan. Current: <b>${fmt(pts[0])}</b> active listings.</p>`; return; }
     const W = 300, H = 70, pad = 6, max = Math.max(...pts), min = Math.min(...pts);
     const x = (i) => pad + (i * (W - 2 * pad)) / (pts.length - 1);
     const y = (v) => H - pad - ((v - min) / (max - min || 1)) * (H - 2 * pad);
@@ -202,7 +202,7 @@
     legend.onAdd = () => {
       const d = L.DomUtil.create("div", "legend");
       d.innerHTML = CONF_ORDER.map((k) => `<i style="background:${COLORS[k]}"></i>${k}`).join("<br>") +
-        `<br><i style="background:#fff;border:2px solid var(--new)"></i>New this week<br><i class="town"></i>Town (excluded)<br><i class="county"></i>Gunnison County`;
+        `<br><i style="background:#fff;border:2px solid var(--new)"></i>New since last scan<br><i class="town"></i>Town (excluded)<br><i class="county"></i>Gunnison County`;
       return d;
     };
     legend.addTo(map);
@@ -283,7 +283,7 @@
         ["License # in ad", r.license_mentions?.length ? r.license_mentions.map((m) => `<b>${esc(m.number)}</b> <small>&ldquo;${esc(m.context)}&rdquo;</small>`).join("<br>") : (r.details_fetched ? "none found" : null)], ["Rating", esc(r.rating)],
         ["Platform", esc(r.platform)], ["Pin (lat, lng)", `${r.lat?.toFixed(5)}, ${r.lng?.toFixed(5)}`], ["First seen", esc(r.first_seen)],
         ["Last seen", esc(r.last_seen)],
-        ["Not found in", r.active && r.missed?.length ? `${esc(r.missed.join(", "))} scan (still counted as active; delisted if missing from the next scan too)` : null], ["Pin to parcel", r.dist_ft != null ? `${fmt(r.dist_ft)} ft` : null]])}
+        ["Not found in", r.active && r.missed?.length ? `${esc(r.missed.join(", "))} scan (still counted as active; delisted if missing from the next scan too, or right away if the listing page is removed)` : null], ["Pin to parcel", r.dist_ft != null ? `${fmt(r.dist_ft)} ft` : null]])}
       <p class="note">${confText}</p>
       ${(r.candidates || []).length > 1 ? `<h4>Candidate parcels within 300 ft</h4><table class="cands">${r.candidates.map((c) =>
         `<tr><td><a href="${PROPERTY_URL(c.account)}" target="_blank" rel="noopener">${esc(c.account)}</a></td><td>${esc(c.address)}<br><small>${esc(c.owner)}</small></td><td>${c.ft} ft</td></tr>`).join("")}</table>` : ""}`;

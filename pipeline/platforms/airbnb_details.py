@@ -17,6 +17,7 @@ from pipeline.platforms.airbnb import STATE_RE, UA
 
 PAGE = "https://www.airbnb.com/rooms/{}"
 COUNT_RE = re.compile(r"^\s*(\d+(?:\.\d+)?)\s+(guests?|bedrooms?|beds?|baths?|private baths?|shared baths?|half-baths?)\s*$", re.I)
+TITLE_RE = re.compile(r"<title>(.*?)</title>", re.S)
 STUDIO_RE = re.compile(r"^\s*studio\s*$", re.I)
 # A license-like keyword, then a token that contains at least one digit: "STR License #24-83B", "Permit: STR21-00163".
 LICENSE_RE = re.compile(
@@ -61,7 +62,7 @@ def parse(page_html):
     if not m:
         return None
     state = json.loads(m.group(1))
-    counts, description, title = {}, "", None
+    counts, description, title, coord, ptype = {}, "", None, None, None
     for k, v in _walk(state):
         if k == "overview" and isinstance(v, dict) and isinstance(v.get("items"), list):
             for item in v["items"]:
@@ -76,8 +77,14 @@ def parse(page_html):
                     counts.setdefault("bedrooms", 0.0)
         elif k == "longDescriptionHtml" and isinstance(v, dict) and not description:
             description = _text(v.get("localizedStringWithTranslationPreference") or v.get("localizedString") or v.get("source"))
-        elif k == "listingTitle" and isinstance(v, str) and not title:
-            title = v
+        elif k == "coordinate" and isinstance(v, dict) and coord is None and v.get("latitude") is not None:
+            coord = (v["latitude"], v["longitude"])
+        elif k == "propertyType" and isinstance(v, str) and ptype is None and " " in v:
+            ptype = v  # "Entire townhouse"
+    t = TITLE_RE.search(page_html)
+    if t:
+        title = re.sub(r"\s+-\s+Airbnb\s*$", "", html.unescape(t.group(1)).strip())
+        title = re.sub(r"\s+-\s+[^-]+ for Rent in .*$", "", title)  # "<name> - Townhouses for Rent in Crested Butte, ..."
     if not counts and not description:
         return None
     return {
@@ -86,6 +93,9 @@ def parse(page_html):
         "beds": counts.get("beds"),
         "baths": counts.get("baths"),
         "page_title": title,
+        "property_type": ptype,
+        "page_lat": coord[0] if coord else None,
+        "page_lng": coord[1] if coord else None,
         "license_mentions": license_mentions(description),
         "description_text": description[:4000],
     }
@@ -96,7 +106,7 @@ def fetch(session, listing_id):
     for attempt in range(3):
         try:
             r = session.get(PAGE.format(listing_id), timeout=40, allow_redirects=True)
-            if r.status_code == 404 or "404 Page Not Found" in r.text[:2000]:
+            if r.status_code in (404, 410) or "404 Page Not Found" in r.text[:2000]:
                 return {"page": "removed"}
             if r.status_code == 200:
                 d = parse(r.text)

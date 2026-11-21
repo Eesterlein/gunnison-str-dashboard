@@ -1,8 +1,8 @@
-name: Weekly STR scan
+name: Monthly STR scan
 
 on:
   schedule:
-    - cron: "0 11 * * 1"   # Mondays 11:00 UTC (5 AM Mountain)
+    - cron: "0 11 15 * *"  # 15th of each month, 11:00 UTC (5 AM Mountain)
   workflow_dispatch:
     inputs:
       platforms:
@@ -41,7 +41,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes"
           else
-            git commit -m "Weekly STR scan $(date -u +%Y-%m-%d)"
+            git commit -m "STR scan $(date -u +%Y-%m-%d)"
             git push
           fi
 

@@ -1,6 +1,6 @@
-# Runbook: when the weekly scan breaks
+# Runbook: when the monthly scan breaks
 
-The scan runs every Monday (GitHub Actions → **Weekly STR scan**). When something goes wrong, GitHub emails the repo owner because the run fails. Partial data is still saved first, and the safety checks make sure nothing is wrongly marked delisted.
+The scan runs once a month (GitHub Actions → **Monthly STR scan**). When something goes wrong, GitHub emails the repo owner because the run fails. Partial data is still saved first, and the safety checks make sure nothing is wrongly marked delisted.
 
 Start by opening the failed run and reading the red error line at the bottom of the log. It will match one of these cases.
 
@@ -8,7 +8,7 @@ Start by opening the failed run and reading the red error line at the bottom of 
 
 **Log says:** `none of the first 20 Airbnb searches returned readable results`, then `nothing scraped`.
 
-**What happened:** Airbnb changed how its search page carries listing data. This happens a few times a year. Nothing was updated this week.
+**What happened:** Airbnb changed how its search page carries listing data. This happens a few times a year. Nothing was updated this month.
 
 **Fix:**
 1. Open a search page in Chrome, for example `https://www.airbnb.com/s/homes?ne_lat=38.9&ne_lng=-106.9&sw_lat=38.8&sw_lng=-107.0&search_by_map=true`.
@@ -21,7 +21,7 @@ Start by opening the failed run and reading the red error line at the bottom of 
    ```bash
    python -c "from pipeline.platforms import airbnb as A; print(len(A.scrape([(38.85,-107.0,38.89,-106.96)])))"
    ```
-5. Push, then re-run: **Actions → Weekly STR scan → Run workflow**.
+5. Push, then re-run: **Actions → Monthly STR scan → Run workflow**.
 
 With Claude Code: open it in this repo, paste the failed run's log, and ask it to fix the Airbnb scraper.
 
@@ -29,11 +29,11 @@ With Claude Code: open it in this repo, paste the failed run's log, and ask it t
 
 **Log says:** `Alert if any source was partial or failed`, with `"ok": false` for `airbnb`.
 
-**What happened:** Airbnb throttled the scan. Throttled pages look normal but contain no results, so the scan found less than 80% of its usual count (the best of the last 4 runs). The data is saved, but **nothing was marked delisted this week**, so the dashboard stays correct.
+**What happened:** Airbnb throttled the scan. Throttled pages look normal but contain no results, so the scan found less than 80% of its usual count (the best of the last 4 runs). The data is saved, but **nothing was marked delisted this scan**, so the dashboard stays correct.
 
-**Fix:** usually nothing. Next week's scan normally recovers. If it happens two or three weeks in a row, re-run by hand at a different time of day. You can also lower `workers` in `airbnb.scrape()` from 4 to 2 to slow the scan down.
+**Fix:** usually nothing. Re-run it by hand a day or two later (**Run workflow**); a fresh run usually recovers. If it keeps happening, try a different time of day. You can also lower `workers` in `airbnb.scrape()` from 4 to 2 to slow the scan down.
 
-If the listing-pages step (`airbnb_details`) is the partial one, Airbnb blocked the page reads partway through. The pages it missed are tried again next week.
+If the listing-pages step (`airbnb_details`) is the partial one, Airbnb blocked the page reads partway through. The pages it missed are tried again on the next run.
 
 ## 3. Listing pages stopped reading
 
@@ -57,7 +57,7 @@ python -c "from pipeline.platforms import airbnb_details as D; print(D.fetch_man
 ## Handy commands
 
 ```bash
-python -m pipeline.run                            # full weekly run (scrape, match, listing pages, rebuild)
+python -m pipeline.run                            # full monthly run (scrape, match, listing pages, rebuild)
 python -m pipeline.run --no-details               # skip reading individual listing pages
 python -m pipeline.run --rematch --date 2026-11-16  # redo one saved scan (undoes what it did first)
 python -m pipeline.run --rebuild-history          # replay every saved scan from scratch
